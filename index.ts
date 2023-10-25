@@ -1,0 +1,1 @@
+export { MinioStorage } from "./lib";
