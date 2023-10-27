@@ -5,11 +5,11 @@
     "rootDir": "./",
     "moduleResolution": "node",
     "typeRoots": ["./node_modules/@types/*"],
-    "declaration": true,
     "outDir": "./dist",
-    "removeComments": true,
+    "declaration": true,
+    "removeComments": false,
     "esModuleInterop": true,
-    "noEmitOnError": true
+    "noEmitOnError": true,
   },
   "include": ["./lib", "./index.ts"],
   "buildOptions": {

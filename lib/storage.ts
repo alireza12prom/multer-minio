@@ -1,30 +1,56 @@
-import { Client } from 'minio';
-import { StorageEngine } from 'multer';
 import { join } from 'node:path';
+import { StorageEngine } from 'multer';
+import { Client, DEFAULT_REGION, RemoveOptions } from 'minio';
+import { IStorageOptions } from './storage.options';
 
-interface StorageOptions {
-  path?: string;
-  initBucket?: boolean;
-}
-
-export class MinioStorage implements StorageEngine {
+export class MinioStorageEngine implements StorageEngine {
+  /**
+   * @param minio An instance of `Minio` clinet.
+   * @param bucket Name of the bucket on `Minio`.
+   * @param options Storage options.
+   */
   constructor(
-    private minio: Client,
-    private bucket: string,
-    private options?: StorageOptions
+    public minio: Client,
+    public bucket: string,
+    public options: IStorageOptions
   ) {
-    this.options = this.options || {};
-    this.init();
+    this.options = this.options || {
+      bucket: undefined,
+      path: undefined,
+      region: undefined,
+    };
+
+    this.options.bucket = this.options.bucket || {
+      init: false,
+      forceDelete: false,
+      versioning: false,
+    };
+
+    this._init();
   }
 
-  async init() {
-    const exists = await this._bucketExists();
-    if (!exists && this.options.initBucket) {
-      await this._initBucket();
-      console.log(`Bucket [${this.bucket}] created.`);
-    } else if (!exists) {
-      console.log(`Bucket [${this.bucket}] is not exists.`);
+  private async _init() {
+    const { bucket, region } = this.options;
+
+    const exists = await this.minio.bucketExists(this.bucket);
+    if (!exists && !bucket.init) {
+      throw new Error(`Bucket [${this.bucket}] does not exists.`);
     }
+
+    if (!exists && bucket.init) {
+      await this.minio.makeBucket(this.bucket, region || DEFAULT_REGION);
+      console.log(`Bucket [${this.bucket}] created.`);
+    }
+
+    if (bucket.versioning) {
+      await this.minio.setBucketVersioning(this.bucket, { Status: bucket.versioning });
+      console.log(`Bucket [${this.bucket}] has versioning status [${bucket.versioning}]`);
+    }
+  }
+
+  private _getDestination(file: Express.Multer.File) {
+    const object = file.filename ? file.filename : file.originalname;
+    return this.options.path ? join(this.options.path, object) : object;
   }
 
   async _handleFile(req: Express.Request, file: Express.Multer.File, callback: any) {
@@ -40,25 +66,22 @@ export class MinioStorage implements StorageEngine {
   }
 
   async _removeFile(req: Express.Request, file: Express.Multer.File, callback: any) {
+    const { bucket } = this.options;
+
     try {
+      const removeOptions: RemoveOptions = {
+        forceDelete: false,
+      };
+
+      if (bucket.versioning === 'Enabled' && bucket.forceDelete) {
+        removeOptions.forceDelete = true;
+      }
+
       const destin = this._getDestination(file);
-      await this.minio.removeObject(this.bucket, destin);
+      await this.minio.removeObject(this.bucket, destin, removeOptions);
       callback(null);
     } catch (error) {
       callback(error);
     }
-  }
-
-  private _bucketExists() {
-    return this.minio.bucketExists(this.bucket);
-  }
-
-  private _initBucket() {
-    return this.minio.makeBucket(this.bucket);
-  }
-
-  private _getDestination(file: Express.Multer.File) {
-    const object = file.filename ? file.filename : file.originalname;
-    return this.options.path ? join(this.options.path, object) : object;
   }
 }

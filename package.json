@@ -4,6 +4,7 @@
   "main": "dist/index.js",
   "description": "A simple storage engine for Multer to upload files on Minio storage.",
   "homepage": "https://github.com/alireza12prom/multer-minio",
+  "types": "./dist/index.d.ts",
   "repository": {
     "type": "github",
     "url": "https://github.com/alireza12prom/multer-minio"

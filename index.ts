@@ -1,1 +1,1 @@
-export { MinioStorage } from "./lib";
+export { MinioStorageEngine } from './lib';

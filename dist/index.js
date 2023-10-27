@@ -1,5 +1,5 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.MinioStorage = void 0;
+exports.MinioStorageEngine = void 0;
 var lib_1 = require("./lib");
-Object.defineProperty(exports, "MinioStorage", { enumerable: true, get: function () { return lib_1.MinioStorage; } });
+Object.defineProperty(exports, "MinioStorageEngine", { enumerable: true, get: function () { return lib_1.MinioStorageEngine; } });
