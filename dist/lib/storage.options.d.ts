@@ -2,7 +2,7 @@ export interface IStorageOptions {
     /**
      * @description the path of the object in the bucket.
      * @example '/path/to/save/object/in/bucket'
-     * @default {undefined}
+     * @default {"/"}
      */
     path?: string;
     /**
@@ -25,5 +25,16 @@ export interface IStorageOptions {
          * @default {false}
          */
         forceDelete: boolean;
+    };
+    object?: {
+        /**
+         * to specify a custom object name.
+         */
+        name?: (req: Express.Request, file: Express.Multer.File) => string;
+        /**
+         * if set `true` the original file name will be used.
+         * @default {false}
+         */
+        useOriginalFilename: boolean;
     };
 }

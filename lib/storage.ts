@@ -1,7 +1,8 @@
 import { join } from 'node:path';
 import { StorageEngine } from 'multer';
-import { Client, DEFAULT_REGION, RemoveOptions } from 'minio';
+import { randomUUID } from 'node:crypto';
 import { IStorageOptions } from './storage.options';
+import { Client, DEFAULT_REGION, RemoveOptions } from 'minio';
 
 export class MinioStorageEngine implements StorageEngine {
   /**
@@ -26,6 +27,11 @@ export class MinioStorageEngine implements StorageEngine {
       versioning: false,
     };
 
+    this.options.object = this.options.object || {
+      name: undefined,
+      useOriginalFilename: false,
+    };
+
     this._init();
   }
 
@@ -48,18 +54,30 @@ export class MinioStorageEngine implements StorageEngine {
     }
   }
 
-  private _getDestination(file: Express.Multer.File) {
-    const object = file.filename ? file.filename : file.originalname;
-    return this.options.path ? join(this.options.path, object) : object;
+  private _getObjectName(req: Express.Request, file: Express.Multer.File) {
+    const { object } = this.options;
+
+    if (object.useOriginalFilename) {
+      return file.originalname;
+    }
+
+    return object.name ? object.name(req, file) : randomUUID();
+  }
+
+  private _getObjectPath(objectName: string) {
+    const { path } = this.options;
+    return join(path || '/', objectName);
   }
 
   async _handleFile(req: Express.Request, file: Express.Multer.File, callback: any) {
     try {
-      const destin = this._getDestination(file);
-      await this.minio.putObject(this.bucket, destin, file.stream, {
+      file.filename = this._getObjectName(req, file);
+      file.path = this._getObjectPath(file.filename);
+
+      await this.minio.putObject(this.bucket, file.path, file.stream, {
         'Content-Type': file.mimetype,
       });
-      callback(null, { object: destin, bucket: this.bucket });
+      callback(null, { bucket: this.bucket });
     } catch (error) {
       callback(error);
     }
@@ -77,8 +95,7 @@ export class MinioStorageEngine implements StorageEngine {
         removeOptions.forceDelete = true;
       }
 
-      const destin = this._getDestination(file);
-      await this.minio.removeObject(this.bucket, destin, removeOptions);
+      await this.minio.removeObject(this.bucket, file.path, removeOptions);
       callback(null);
     } catch (error) {
       callback(error);

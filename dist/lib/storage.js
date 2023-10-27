@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MinioStorageEngine = void 0;
 const node_path_1 = require("node:path");
+const node_crypto_1 = require("node:crypto");
 const minio_1 = require("minio");
 class MinioStorageEngine {
     /**
@@ -23,6 +24,10 @@ class MinioStorageEngine {
             forceDelete: false,
             versioning: false,
         };
+        this.options.object = this.options.object || {
+            name: undefined,
+            useOriginalFilename: false,
+        };
         this._init();
     }
     async _init() {
@@ -40,17 +45,25 @@ class MinioStorageEngine {
             console.log(`Bucket [${this.bucket}] has versioning status [${bucket.versioning}]`);
         }
     }
-    _getDestination(file) {
-        const object = file.filename ? file.filename : file.originalname;
-        return this.options.path ? (0, node_path_1.join)(this.options.path, object) : object;
+    _getObjectName(req, file) {
+        const { object } = this.options;
+        if (object.useOriginalFilename) {
+            return file.originalname;
+        }
+        return object.name ? object.name(req, file) : (0, node_crypto_1.randomUUID)();
+    }
+    _getObjectPath(objectName) {
+        const { path } = this.options;
+        return (0, node_path_1.join)(path || '/', objectName);
     }
     async _handleFile(req, file, callback) {
         try {
-            const destin = this._getDestination(file);
-            await this.minio.putObject(this.bucket, destin, file.stream, {
+            file.filename = this._getObjectName(req, file);
+            file.path = this._getObjectPath(file.filename);
+            await this.minio.putObject(this.bucket, file.path, file.stream, {
                 'Content-Type': file.mimetype,
             });
-            callback(null, { object: destin, bucket: this.bucket });
+            callback(null, { bucket: this.bucket });
         }
         catch (error) {
             callback(error);
@@ -65,8 +78,7 @@ class MinioStorageEngine {
             if (bucket.versioning === 'Enabled' && bucket.forceDelete) {
                 removeOptions.forceDelete = true;
             }
-            const destin = this._getDestination(file);
-            await this.minio.removeObject(this.bucket, destin, removeOptions);
+            await this.minio.removeObject(this.bucket, file.path, removeOptions);
             callback(null);
         }
         catch (error) {
